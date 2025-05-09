@@ -1,5 +1,6 @@
 from OpenGL.GL import *
 from OpenGL.GLUT import *
+from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
 from OpenGL.GLU import *
 import math, time, sys, random
 
@@ -422,8 +423,9 @@ def update():
     if game_over or game_won:
         return
 
-    move_dir = [(-1 if move_keys['a'] else 1 if move_keys['d'] else 0),
-                (-1 if move_keys['s'] else 1 if move_keys['w'] else 0)]
+    # Adjusted movement directions
+    move_dir = [(1 if move_keys['w'] else -1 if move_keys['s'] else 0),
+                (-1 if move_keys['d'] else 1 if move_keys['a'] else 0)]
     
     if move_dir[0] and move_dir[1]:
         move_dir = [d/math.sqrt(2) for d in move_dir]
