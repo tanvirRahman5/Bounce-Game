@@ -4,7 +4,6 @@ from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
 from OpenGL.GLU import *
 import math, time, sys, random
 
-
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 ASPECT = WINDOW_WIDTH / WINDOW_HEIGHT
@@ -76,8 +75,13 @@ obstacles = [
 ]
 
 collectibles = []
-special_point = {'type': 'star', 'pos': (0, 0, 10), 'collected': False}
+special_points = []
 holes = set()
+theme = "default"
+speed_multiplier = 1.0  
+
+shields = [{'pos': [200, 200, 10], 'collected': False}, {'pos': [-200, -200, 10], 'collected': False}]
+shield_active = False
 
 def generate_holes():
     global holes
@@ -90,7 +94,7 @@ def generate_holes():
 def find_safe_tile():
     while True:
         i = random.randint(0, grid_size_x - 1)
-        j = random.randint(0, grid_size_y - 1)
+        j = random.randint(0, grid_size_y - 1)                                                                                                                                                      
         if (i, j) not in holes:
             x = i * tile_size - half_size_x + tile_size / 2
             y = j * tile_size - half_size_y + tile_size / 2
@@ -98,7 +102,7 @@ def find_safe_tile():
 
 def reset_game(reset_score=True, reset_lives=True):
     global ball_pos, ball_vel, jumping, jump_start_time, score, lives, game_over, game_won
-    global collectibles, time_last, obstacles, last_tile, time_on_tile, show_timer, special_point
+    global collectibles, time_last, obstacles, last_tile, time_on_tile, show_timer, special_points
     
     ball_pos[:] = find_safe_start_tile()
     ball_vel[:] = [0.0, 0.0, 0.0]
@@ -109,15 +113,18 @@ def reset_game(reset_score=True, reset_lives=True):
         score = 0
         generate_holes()
         collectibles = []
-        for _ in range(5):
+        for _ in range(10):
             x, y = find_safe_tile()
             collectibles.append({
                 'type': random.choice(['cube', 'torus', 'pyramid']),
                 'pos': (x, y, 10)
             })
-        x, y = find_safe_tile()
-        special_point['pos'] = (x, y, 10)
-        special_point['collected'] = False
+        
+        
+        special_points = []
+        for _ in range(5): 
+            x, y = find_safe_tile()
+            special_points.append({'pos': (x, y, 10), 'collected': False})
     
     if reset_lives:
         lives = 3
@@ -172,13 +179,20 @@ def setup_scene():
     glClearColor(0.5, 0.8, 1.0, 1.0)
 
 def draw_floor():
-    green_r, green_g, green_b = 0.302, 0.471, 0.388
+    global theme
+    if theme == "default":
+        green_r, green_g, green_b = 0.302, 0.471, 0.388
+        hole_color = (0.0, 0.0, 0.0)
+    elif theme == "dark":
+        green_r, green_g, green_b = 0.1, 0.1, 0.1
+        hole_color = (0.5, 0.0, 0.0)
+
     for i in range(grid_size_x):
         for j in range(grid_size_y):
             x = i * tile_size - half_size_x
             y = j * tile_size - half_size_y
             if (i, j) in holes:
-                glColor3f(0.0, 0.0, 0.0)
+                glColor3f(*hole_color)
             else:
                 if (i + j) % 2 == 0:
                     glColor3f(1.0, 1.0, 1.0)
@@ -210,13 +224,22 @@ def draw_walls():
         glEnd()
 
 def draw_tree(x, y):
-    glColor3f(0.55, 0.27, 0.07)
+    global theme
+    if theme == "default":
+        trunk_color = (0.55, 0.27, 0.07)
+        foliage_color = (0.0, 0.5, 0.0)
+    elif theme == "dark":
+        trunk_color = (0.3, 0.15, 0.05)
+        foliage_color = (0.0, 0.3, 0.3)
+
+    glColor3f(*trunk_color)
     glPushMatrix()
     glTranslatef(x, y, 0)
     glScalef(5, 5, 30)
     glutSolidCube(1)
     glPopMatrix()
-    glColor3f(0.0, 0.5, 0.0)
+
+    glColor3f(*foliage_color)
     glPushMatrix()
     glTranslatef(x, y, 30)
     glutSolidCone(15, 40, 12, 12)
@@ -232,31 +255,32 @@ def draw_trees():
         x += spacing
 
 def draw_special_point():
-    if not special_point['collected']:
-        glPushMatrix()
-        x, y, z = special_point['pos']
-        glTranslatef(x, y, z)
-        glColor3f(1.0, 1.0, 0.0)
-        
-        glBegin(GL_TRIANGLE_FAN)
-        glVertex3f(0, 0, 0)
-        for i in range(11):
-            angle = i * 2 * math.pi / 10
-            radius = 10 if i % 2 == 0 else 5
-            glVertex3f(math.cos(angle) * radius, math.sin(angle) * radius, 0)
-        glEnd()
-        
-        glColor3f(1.0, 1.0, 1.0)
-        glBegin(GL_LINES)
-        glVertex3f(0, 0, 5)
-        glVertex3f(0, 0, 15)
-        glVertex3f(5, 0, 10)
-        glVertex3f(-5, 0, 10)
-        glVertex3f(0, 5, 10)
-        glVertex3f(0, -5, 10)
-        glEnd()
-        
-        glPopMatrix()
+    for sp in special_points:
+        if not sp['collected']:
+            glPushMatrix()
+            x, y, z = sp['pos']
+            glTranslatef(x, y, z)
+            glColor3f(1.0, 1.0, 0.0)
+            
+            glBegin(GL_TRIANGLE_FAN)
+            glVertex3f(0, 0, 0)
+            for i in range(11):
+                angle = i * 2 * math.pi / 10
+                radius = 10 if i % 2 == 0 else 5
+                glVertex3f(math.cos(angle) * radius, math.sin(angle) * radius, 0)
+            glEnd()
+            
+            glColor3f(1.0, 1.0, 1.0)
+            glBegin(GL_LINES)
+            glVertex3f(0, 0, 5)
+            glVertex3f(0, 0, 15)
+            glVertex3f(5, 0, 10)
+            glVertex3f(-5, 0, 10)
+            glVertex3f(0, 5, 10)
+            glVertex3f(0, -5, 10)
+            glEnd()
+            
+            glPopMatrix()
 
 def draw_collectibles():
     for c in collectibles:
@@ -268,22 +292,16 @@ def draw_collectibles():
         elif c['type'] == 'torus':
             glutWireTorus(3, 10, 12, 12)
         elif c['type'] == 'pyramid':
-            # Draw base
             glBegin(GL_QUADS)
             glVertex3f(-10, -10, 0)
             glVertex3f(10, -10, 0)
             glVertex3f(10, 10, 0)
             glVertex3f(-10, 10, 0)
             glEnd()
-            # Draw sides
             glBegin(GL_TRIANGLES)
-            # Front
             glVertex3f(0,0,20); glVertex3f(-10,-10,0); glVertex3f(10,-10,0)
-            # Back
             glVertex3f(0,0,20); glVertex3f(10,10,0); glVertex3f(-10,10,0)
-            # Right
             glVertex3f(0,0,20); glVertex3f(10,-10,0); glVertex3f(10,10,0)
-            # Left
             glVertex3f(0,0,20); glVertex3f(-10,10,0); glVertex3f(-10,-10,0)
             glEnd()
         glPopMatrix()
@@ -389,7 +407,9 @@ def draw_win_message():
         
         glColor3f(0, 1, 0)
         win_text = "YOU WIN! (Press R to Restart)"
-        text_width = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, win_text.encode())
+        win_text_bytes = (ctypes.c_ubyte * len(win_text))(*win_text.encode())
+        text_width = glutBitmapLength(GLUT_BITMAP_HELVETICA_18, win_text_bytes)
+        
         glRasterPos2f((WINDOW_WIDTH - text_width) // 2, WINDOW_HEIGHT // 2)
         
         for ch in win_text:
@@ -415,24 +435,23 @@ def update_obstacles(dt):
             o['vel'] *= -1
 
 def update():
-    global time_last, ball_pos, ball_vel, jumping, jump_start_time, score, lives, game_over, last_tile, time_on_tile, show_timer, game_won
+    global time_last, ball_pos, ball_vel, jumping, jump_start_time, score, lives, game_over, last_tile, time_on_tile, show_timer, game_won, speed_multiplier, shield_active
     
     now = time.time()
     dt = now - time_last
     time_last = now
     if game_over or game_won:
         return
-
-    # Adjusted movement directions
-    move_dir = [(1 if move_keys['w'] else -1 if move_keys['s'] else 0),
+    move_dir = [(-1 if move_keys['s'] else 1 if move_keys['w'] else 0),
                 (-1 if move_keys['d'] else 1 if move_keys['a'] else 0)]
     
     if move_dir[0] and move_dir[1]:
-        move_dir = [d/math.sqrt(2) for d in move_dir]
+        move_dir = [d / math.sqrt(2) for d in move_dir]
     
-    speed = 200.0
-    ball_vel[0] = move_dir[0] * speed
-    ball_vel[1] = move_dir[1] * speed
+    base_speed = 200.0
+    ball_vel[0] = move_dir[0] * base_speed * speed_multiplier
+    ball_vel[1] = move_dir[1] * base_speed * speed_multiplier
+
 
     on_ground = ball_pos[2] <= ball_radius
     if space_pressed and on_ground and not jumping:
@@ -445,6 +464,7 @@ def update():
         if not space_pressed or (now - jump_start_time) >= max_jump_duration:
             jumping = False
 
+
     ball_vel[2] += gravity * dt
     for i in range(3): 
         ball_pos[i] += ball_vel[i] * dt
@@ -456,6 +476,40 @@ def update():
 
     ball_pos[0] = max(-half_size_x + ball_radius, min(half_size_x - ball_radius, ball_pos[0]))
     ball_pos[1] = max(-half_size_y + ball_radius, min(half_size_y - ball_radius, ball_pos[1]))
+
+ 
+    for o in obstacles:
+        dx = ball_pos[0] - o['pos'][0]
+        dy = ball_pos[1] - o['pos'][1]
+        dz = ball_pos[2] - o['pos'][2]
+        distance = math.sqrt(dx**2 + dy**2 + dz**2)
+        
+        if distance < ball_radius + o['current_size']:
+            if shield_active:
+                shield_active = False 
+                print("Shield protected you from losing a life!")
+            else:
+                
+                lives -= 1
+                print(f"Lives decreased! Remaining lives: {lives}")
+                if lives <= 0:
+                    game_over = True
+                    print("Game Over!")
+                else:
+                    reset_game(reset_score=False, reset_lives=False)
+            break
+
+    for shield in shields:
+        if not shield['collected']:
+            dx = ball_pos[0] - shield['pos'][0]
+            dy = ball_pos[1] - shield['pos'][1]
+            dz = ball_pos[2] - shield['pos'][2]
+            distance = math.sqrt(dx**2 + dy**2 + dz**2)
+            
+            if distance < ball_radius + 10: 
+                shield['collected'] = True
+                shield_active = True
+                print("Shield activated!")
 
     i = int(math.floor((ball_pos[0] + half_size_x) / tile_size))
     j = int(math.floor((ball_pos[1] + half_size_y) / tile_size))
@@ -472,8 +526,6 @@ def update():
                 show_timer = False
                 if lives <= 0:
                     game_over = True
-                else:
-                    reset_game(reset_score=False, reset_lives=False)
         else:
             last_tile = current_tile
             time_on_tile = 0.0
@@ -483,30 +535,17 @@ def update():
         time_on_tile = 0.0
         show_timer = False
 
-    if (i,j) in holes and ball_pos[2] <= ball_radius + 1:
+
+    if (i, j) in holes and ball_pos[2] <= ball_radius + 1:
         lives -= 1
         if lives <= 0:
             game_over = True
         else:
             reset_game(reset_score=False, reset_lives=False)
 
+
     update_obstacles(dt)
 
-    for o in obstacles:
-        dx = ball_pos[0] - o['pos'][0]
-        dy = ball_pos[1] - o['pos'][1]
-        dz = ball_pos[2] - o['pos'][2]
-        distance = math.sqrt(dx**2 + dy**2 + dz**2)
-        
-        if distance < ball_radius + o['current_size']:
-            lives -= 1
-            if lives <= 0:
-                game_over = True
-            else:
-                reset_game(reset_score=False, reset_lives=False)
-            break
-
-    # Check for collectibles with 3D collision
     remaining = []
     for c in collectibles:
         dx = ball_pos[0] - c['pos'][0]
@@ -516,23 +555,32 @@ def update():
         
         if distance < ball_radius + 15:
             score += 1
+            new_speed_multiplier = 1.0 + (score * 0.1)
+            if new_speed_multiplier > speed_multiplier:
+                speed_multiplier = new_speed_multiplier
+                print(f"Speed increased!")
         else:
             remaining.append(c)
     collectibles[:] = remaining
 
-    # Check for special point with 3D collision
-    if not special_point['collected']:
-        sp_x, sp_y, sp_z = special_point['pos']
-        dx = ball_pos[0] - sp_x
-        dy = ball_pos[1] - sp_y
-        dz = ball_pos[2] - sp_z
-        distance = math.sqrt(dx**2 + dy**2 + dz**2)
-        
-        if distance < ball_radius + 15:
-            score += 2
-            special_point['collected'] = True
-            if score >= 7:  # Fixed win condition
-                game_won = True
+
+    for sp in special_points:
+        if not sp['collected']:
+            sp_x, sp_y, sp_z = sp['pos']
+            dx = ball_pos[0] - sp_x
+            dy = ball_pos[1] - sp_y
+            dz = ball_pos[2] - sp_z
+            distance = math.sqrt(dx**2 + dy**2 + dz**2)
+            
+            if distance < ball_radius + 15:
+                score += 2
+                new_speed_multiplier = 1.0 + (score * 0.1)
+                if new_speed_multiplier > speed_multiplier:
+                    speed_multiplier = new_speed_multiplier
+                    print(f"Speed increased!")
+                sp['collected'] = True
+                if score >= 10:
+                    game_won = True
 
 def display():
     setup_scene()
@@ -541,6 +589,7 @@ def display():
     draw_trees()
     if not game_won:
         draw_collectibles()
+    draw_shields()
     draw_obstacles()
     draw_ball()
     draw_score()
@@ -548,18 +597,31 @@ def display():
     draw_win_message()
     glutSwapBuffers()
 
+def draw_shields():
+    """Draw the shield boxes."""
+    for shield in shields:
+        if not shield['collected']:
+            glPushMatrix()
+            x, y, z = shield['pos']
+            glTranslatef(x, y, z)
+            glColor3f(0.0, 1.0, 1.0)  
+            glutSolidCube(20)
+            glPopMatrix()
+
 def idle():
     update()
     glutPostRedisplay()
 
-def keyboard(k,x,y):
-    global space_pressed
+def keyboard(k, x, y):
+    global space_pressed, theme
     if k == b'\x1b': sys.exit()
     if k == b' ': space_pressed = True
-    if k in [b'a',b'd',b'w',b's']: move_keys[k.decode()] = True
+    if k in [b'a', b'd', b'w', b's']: move_keys[k.decode()] = True
     if k == b'r': 
         if game_over or game_won:
             reset_game()
+    if k == b't':
+        theme = "dark" if theme == "default" else "default"
 
 def keyboard_up(k,x,y):
     global space_pressed
@@ -578,7 +640,7 @@ def main():
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
-    glutCreateWindow(b"3D Ball Game - Fixed Version")
+    glutCreateWindow(b"3D Ball Game--423 project")
     glutReshapeFunc(reshape)
     glutDisplayFunc(display)
     glutIdleFunc(idle)
